@@ -1,0 +1,7 @@
+#!/usr/bin/env python
+
+nodes = open('nodes.list')
+
+for line in nodes:
+    print line.strip()
+

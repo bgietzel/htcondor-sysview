@@ -1,0 +1,50 @@
+HOW TO INSTALL:
+
+1) dependencies
+
+  Memcached - sysview connects to memcache using localhost:11211
+  - install rpms memcached-1.4.4-3.el6.x86_64 and python-memcached-1.43-6.el6.noarch and start memcached. Depending on the size of your pool you may want to increase the default mem setting from 64mb, we use 512mb. 
+
+  HTCondor
+  - Install a version of HTCondor.  
+  - Add IP of this host to ALLOW_READ on the HTCondor servers you'd like to display. To test, ensure that 'condor_q -name <servername>' and 'condor_status -pool <poolname>' works for the servers and pools you want to monitor.
+
+
+2) git clone (URL) into /opt/sysview (or preferred directory).
+
+ - create a directory (or symlink) named jobinfo inside the html directory. This is where the job html files are written to.   
+ - create a directory named movie (this is where a png file is stored each time mosaic_render.py is run.)
+ - edit nodes.list to show all nodes in your condor pool along with the # of slots on each node.
+ - edit vars.py 
+    BASE_URL=urlofyourwebserver
+    CLUSTER_ID=nameofyourcluster
+    CLUSTER_IDS=listofyourclusters
+    server_name="submitnodenamehere" for your main submitter.
+    server_names={"submittera":"a"} or {"submittera":"a","submitterb":"b"} notation.
+    pool_names = {"a","poola" } or { "a":"poola","b":"poolb" }
+    (optional) - Edit icon_map.py with group information, create matching 16x16 png files for each group, name them as [A-Za-z].png (ie C.png) and place them in /var/www/html/images/.
+
+
+3) add these crontabs 
+
+# SYSVIEW
+# poll condor_submitters and pools listed and load memcache with pool status
+*/15 * * * * cd /opt/sv/sysview ; ./mosaic_backend_condor.py -v > /var/log/mbc.log  2>&1
+
+# poll memcache and create userjob efficiency rankings
+*/12 * * * * cd /opt/sv/sysview ; ./userjobs5.py -v > /var/log/uj5.log  2>&1
+
+# poll memcache and produce sysview mosaic webpage 
+*/12 * * * * cd /opt/sv/sysview ; ./mosaic_render.py -v > /var/log/mr.log  2>&1
+
+# internal version of sysview with all data displayed
+*/10 * * * * cd /opt/sysview ; ./mosaic_render.py -a -v > /var/log/mr_int.log  2>&1
+
+# remove html job files when jobs are no longer active
+8 15 * * * cd /opt/sysview ; ./remove_old_html_files.py > /var/log/sv_old_files.log  2>&1
+
+
+4) debugging!
+
+Wait for crons to make sysview mosaic and try to view it in web browser.  Check crontab logs for errors and edit files accordingly then rerun as needed.  You might have to restart memcache to clear out results if you edit the node list. 
+

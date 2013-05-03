@@ -1,0 +1,85 @@
+#!/usr/bin/env python
+
+#  Worker node health check script, to run from condor startd
+
+from mc_util import *
+import sys, os
+import memcache
+import socket
+import subprocess
+
+hostname = socket.gethostname() 
+node = shortname(hostname)
+
+#
+# define directories to test
+# 
+SCRATCH = "/scratch"
+TMP = "/tmp"
+SLASH = "/"
+FNAME = "node_check"
+
+
+def setOffline(msg):
+   mc_set( node+".status", "offline")
+   mc_set( node+".message", msg)
+   print "NodeOnline = False"
+   print "NodeOfflineReason = %s" % msg
+
+def setOnline():
+   mc_set( node+".status", "online")
+   print "NodeOnline = True"
+
+
+# Test if the node has been set offline manually
+MANUALSTATUS = mc_get( node+".manualstatus" )
+
+if MANUALSTATUS == 'offline':
+    MANUALREASON = mc_get( node+".manualreason" )
+    setOffline("Manual offline: %s " % MANUALREASON)
+    sys.exit()
+#
+# TESTS
+#
+def can_write( mypath, myfile ):
+  if os.path.exists( "%s" % (mypath) ):
+    if not os.path.isfile( "%s/%s" % (mypath, myfile) ):
+      if ( open( "%s/%s" % (mypath, myfile), 'w').close() ):
+        setOffline("cannot write to %s" % mypath) 
+        sys.exit()
+      else:
+        if debug: print "can write to %s" % mypath
+        os.remove( "%s/%s" % (mypath, myfile))
+
+def correct_perms( mypath, myperms):
+  if os.path.exists( "%s" % (mypath) ):
+    PERMS = os.stat(mypath).st_mode
+    if not ( PERMS & 0777 == 1777 ):
+      setOffline("permissions on %s should be 1777, are %s" % mypath, PERMS)
+      if debug: print "permissions on %s should be 1777, are %s" % (mypath, PERMS)
+      sys.exit()
+
+def disk_free ( mypath, amount ):  
+  if os.path.exists( "%s" % (mypath) ):
+    df = subprocess.Popen(["/bin/df", "-Ph", "%s" % mypath], stdout=subprocess.PIPE)
+    output = df.communicate()[0]
+    device, size, used, available, percent, mountpoint = output.split("\n")[1].split()
+
+    available = available.split(".")[0]
+
+    if ( available < amount ):
+      setOffline("%s disk space available is %s GB" % mypath, available)
+      sys.exit()
+
+
+##
+# run the checks
+## 
+# can_write( SCRATCH )
+# can_write( TMP )
+# correct_perms( SCRATCH )
+# disk_free ( SCRATCH, 5 )
+# disk_free ( SLASH, 5 )
+
+setOnline()
+sys.exit()
