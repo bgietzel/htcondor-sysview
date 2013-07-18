@@ -9,20 +9,23 @@ HOW TO INSTALL:
   - Install a version of HTCondor.  
   - Add IP of this host to ALLOW_READ on the HTCondor servers you'd like to display. To test, ensure that 'condor_q -name <servername>' and 'condor_status -pool <poolname>' works for the servers and pools you want to monitor.
 
+  Apache
+  - necessary for display of html files.
 
-2) git clone (URL) into /opt/sysview (or preferred directory).
+2) git clone htcondor-sysview into preferred directory
 
+ - make the html dir accessible to the local web server 
  - create a directory (or symlink) named jobinfo inside the html directory. This is where the job html files are written to.   
  - create a directory named movie (this is where a png file is stored each time mosaic_render.py is run.)
- - edit nodes.list to show all nodes in your condor pool along with the # of slots on each node.
- - edit vars.py 
+ - Using _nodes.list example, create nodes.list  to show all nodes in your condor pool along with the # of slots on each node.
+ - Using _vars.py example, create vars.py with the following,
     BASE_URL=urlofyourwebserver
     CLUSTER_ID=nameofyourcluster
     CLUSTER_IDS=listofyourclusters
     server_name="submitnodenamehere" for your main submitter.
     server_names={"submittera":"a"} or {"submittera":"a","submitterb":"b"} notation.
     pool_names = {"a","poola" } or { "a":"poola","b":"poolb" }
-    (optional) - Edit icon_map.py with group information, create matching 16x16 png files for each group, name them as [A-Za-z].png (ie C.png) and place them in /var/www/html/images/.
+    (optional) - Using _icon_map.py example, create icon_map.py with group information.  Make 16x16 png files for each group, name them as [A-Za-z].png (ie C.png) and place them in /var/www/html/images/.
 
 
 3) add these crontabs 
