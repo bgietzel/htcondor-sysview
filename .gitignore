@@ -1,0 +1,7 @@
+# files to ignore
+nodes.list
+icon_map.py
+mc_util.py
+vars.py
+html/*
+*.swp
