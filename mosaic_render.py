@@ -16,6 +16,7 @@ mc = None
 verbose = 0
 debug = 0
 admin = False
+sugar = False
 print_times = False
 
 for x in sys.argv:
@@ -31,6 +32,9 @@ for x in sys.argv:
     if x.startswith('-a'):
         admin = True
         print "Admin version including job data"
+    if x.startswith('-s'):
+        sugar = True
+        print "Only show active cpus"
 
 
 print "CLUSTER_ID is %s " % CLUSTER_ID
@@ -220,6 +224,7 @@ def mkpage(data, filename):
 
     # render each legend item as a png and display it.
     for color in slotdata.keys():
+     if sugar and color == green or not sugar:
       count=str(slotdata[color])
       if debug: print "count is %s" % count
       status = slotdesc[color]
@@ -472,7 +477,14 @@ for node in nodes:
             if 'maintenance' in msg.lower():
                 color = grey
             text.append("note: " + msg)
-        data.append((slotname, color, dot_type, text, link))
+
+        # only publish active cpus for sugar mode
+        if sugar:
+          if color not in (black, red):
+            data.append((slotname, color, dot_type, text, link))
+        else:
+          data.append((slotname, color, dot_type, text, link))
+
         if verbose: print "slotname %s " % (slotname)    
         if verbose: print "color %d %d %d " % (color[0], color[1], color[2]) 
         if verbose: print "dot_type %s " %  dot_type      
@@ -484,7 +496,10 @@ for node in nodes:
 timer.end()
 
 timer = Timer("mkpage")
-filename = WEBDIR + '/mosaic.html'
+if sugar:
+  filename = WEBDIR + '/mosaic_sugar.html'
+else:
+  filename = WEBDIR + '/mosaic.html'
 mkpage(data, filename)
 timer.end()
 
