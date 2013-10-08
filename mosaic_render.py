@@ -31,16 +31,18 @@ for x in sys.argv:
         print "timing enabled"
     if x.startswith('-a'):
         admin = True
+        URL=BASE_URL + "/mosaic.html"
+        # widescreen version for admins
+        columns=180
         print "Admin version including job data"
     if x.startswith('-s'):
         sugar = True
+        URL=BASE_URL + "/sugar.html"
         print "Only show active cpus"
 
 
 print "CLUSTER_ID is %s " % CLUSTER_ID
-
-# widescreen version for admins
-if admin: columns=120
+print "URL is %s " % URL
 
 main_timer = Timer("overall")
 
@@ -220,7 +222,7 @@ def mkpage(data, filename):
     img(o, "text.png", eff_width * 9, eff_height, margin + 250, curr_height )
     curr_height = curr_height + eff_height 
 
-    slotdesc = {green: "busy", red: "down", pink: "offline", black: "idle", dkgreen: "backfill"}
+    slotdesc = {green: "busy", red: "down", dkgrey: "owner", pink: "offline", black: "idle", dkgreen: "backfill"}
 
     # render each legend item as a png and display it.
     for color in slotdata.keys():
@@ -348,7 +350,6 @@ for node in nodes:
     name = shortname(node)
     if debug: print "NAME is %s " % name
     np, state, load, msg = node_info.get(name + '.info')
-    if debug: print "STATE is %s " % state
 
     for slot in xrange(1,np+1):
         keys.append("%s.%d" % (name, slot))
@@ -361,12 +362,13 @@ timer = Timer("munge data")
 keys = []
 
 # set up node status counts for legend
-slotdata = {green: 0, red: 0, pink:0, black: 0, dkgreen: 0}
+slotdata = {green: 0, red: 0, pink:0, dkgrey: 0, black: 0, dkgreen: 0}
 
 for node in nodes:
     hostname = shortname(node)
     if debug: print "HOSTNAME is %s " % hostname
     ncpu, state, load, msg = node_info.get(hostname + '.info')
+ 
     for slot in xrange(1, ncpu+1):
         if debug: print "slot is %d " % slot
         color = black
@@ -434,6 +436,16 @@ for node in nodes:
               effcy = 100
               
               slotdata[dkgreen] += 1
+          
+            # is this a slurm job?
+            if ( job.endswith(".")):
+              if debug: print "slurm job %s" % job
+              dot_type = 's'
+              color = rgb(7200, 7200)
+              effcy = 100
+              
+              slotdata[dkgreen] += 1
+
 
             if debug: print "dot_type is %s" % dot_type
  
@@ -449,6 +461,9 @@ for node in nodes:
         elif 'down' in state:
             color = red
             slotdata[red] += 1
+        elif 'owner' in state:
+            color = dkgrey
+            slotdata[dkgrey] += 1
         if msg and 'ERROR' in msg:
             color = red
             slotdata[red] += 1
@@ -497,9 +512,11 @@ timer.end()
 
 timer = Timer("mkpage")
 if sugar:
-  filename = WEBDIR + '/mosaic_sugar.html'
-else:
+  filename = WEBDIR + '/sugar.html'
+elif admin:
   filename = WEBDIR + '/mosaic.html'
+else:
+  filename = WEBDIR + '/sysview.html'
 mkpage(data, filename)
 timer.end()
 
