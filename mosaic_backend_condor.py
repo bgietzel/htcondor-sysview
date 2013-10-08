@@ -13,6 +13,7 @@ import sys, os, re, time, string
 import memcache
 from cStringIO import StringIO
 import threading
+import subprocess
 
 mc = None
 verbose = 0
@@ -48,6 +49,7 @@ main_timer = Timer("overall")
 # set up job storage arrays for boinc
 boinc_job_info = []
 boinc_jobs = []
+slurm_jobs = []
 
 #### Run condor_nodes, get node info
 nodes = []
@@ -82,7 +84,7 @@ timer = Timer("condor_status")
 num_boinc_jobs = 0
 boinc_slot = 0
 
-for pool_name in pool_names.values():
+for pool_abbr, pool_name in pool_names.items():
   timer = Timer("condor_status")
 
   condor_status_cmd = "condor_status -long -pool %s" % (pool_name)  
@@ -129,8 +131,10 @@ for pool_name in pool_names.values():
         setattr(node, 'state', 'offline')
     elif node and k == 'NodeOnlineReason':
         setattr(node, 'note', v)
-    elif node:
+    elif node and (node.state not in 'owner' and node.state not in 'offline'):
         setattr(node, 'state', 'online')
+    if node and k == 'State' and v == 'Owner' and (pool_abbr == 'cs' or pool_abbr == 'cae'):
+        setattr(node, 'state', 'owner')
 
     # find the LoadAvg
     if ( k == 'TotalLoadAvg' and node):
@@ -164,7 +168,7 @@ for pool_name in pool_names.values():
       if debug: print 'boinc slot number is %d' % boinc_slot
 
     # now set for boinc
-    if ( k == 'RemoteOwner' and v.startswith("boinc") ):
+    if ( (k == 'RemoteOwner' and v.startswith("boinc") ) or (k == 'RemoteUser' and v.startswith("EinsteinAtHome") ) ):
       # create a fake job for boinc as these jobs show up on the execute side only, no submitter
       job = Job()
       job.user = "boinc"
@@ -181,8 +185,46 @@ for pool_name in pool_names.values():
 
   timer.end()
 
+# SLURM
+num_slurm_jobs = 0
+slurm_status_cmd = '/usr/bin/sinfo -h -p pre -o "%n.chtc.wisc.edu %1t"'
+
+proc = subprocess.Popen(["%s" % slurm_status_cmd], stdout=subprocess.PIPE, shell=True)
+(out, err) = proc.communicate()
+
+slurm_arr = []
+slurm_arr = out.split('\n')
+
+# if the host is running a slurm job, create a fake job for it.
+for line in slurm_arr:
+  if (" " in line):
+    k, v = line.split(' ')
+
+    if v.startswith('a'):
+      job = Job()
+      job.user = "slurm"
+      job.type="slurm"
+      job.walltime = 1
+      job.cputime = 1
+      if debug: print "SLURM JOB ID %s" % job.job_id
+
+      n = nodes_by_name.get(shortname(k))
+      setattr(n, 'state', 'online')
+
+      # slurm jobs take the whole machine over, so insert a slurm job for each cpu
+      nslots = n.np
+
+      for slurm_cpu in xrange(nslots+1):
+        job.job_id = "%d." %  (num_slurm_jobs)
+ 
+        key = "%s.%d" % (shortname(k), slurm_cpu)
+        mc_set(key, job.job_id)
+        slurm_jobs.append(job)
+        num_slurm_jobs += 1
 
 print "NUM BOINC JOBS: %s " % num_boinc_jobs
+print "NUM SLURM JOBS: %s " % num_slurm_jobs
+
 # hosts are online by default
 node_names = nodes_by_name.keys()
 node_names.sort()
@@ -195,7 +237,7 @@ for n in nodes:
     except KeyError, e:
         continue
     if  manualstatus[shortname(n.hostname)+".manualstatus"] == 'offline':
-        setattr(n, 'state', 'offline')
+        setattr(n, 'status', 'offline')
         setattr(n, 'note', mc_get(shortname(n.hostname)+".manualreason"))
 
 
@@ -207,7 +249,7 @@ mc_set(CLUSTER_ID+".nodes", node_names, 0)
 for n in nodes:
     # info = (n.np, n.Activity.lower(), n.LoadAvg or 0, n.note)
     info = (n.np, n.state, n.LoadAvg or 0, n.note)
-    
+  
     if debug: print "SHORT HOSTNAME is %s" % (shortname(n.hostname))
     mc_set(shortname(n.hostname)+".info", info)
 
@@ -276,6 +318,7 @@ for server_name in server_names.keys():
 qjobs = [j for j in jobs if j.JobStatus == 1]
 jobs = [j for j in jobs if j.JobStatus == 2]
 jobs += boinc_jobs
+jobs += slurm_jobs
 job_ids = [j.job_id for j in jobs]
 job_ids.sort(key=float)
 
