@@ -242,7 +242,7 @@ for n in nodes:
     except KeyError, e:
         continue
     if  manualstatus[shortname(n.hostname)+".manualstatus"] == 'offline':
-        setattr(n, 'status', 'offline')
+        setattr(n, 'state', 'offline')
         setattr(n, 'note', mc_get(shortname(n.hostname)+".manualreason"))
 
 
