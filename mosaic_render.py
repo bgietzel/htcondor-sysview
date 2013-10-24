@@ -461,7 +461,7 @@ for node in nodes:
         elif 'down' in state:
             color = red
             slotdata[red] += 1
-        elif 'owner' in state:
+        elif 'owner' in state and not job:
             color = dkgrey
             slotdata[dkgrey] += 1
         if msg and 'ERROR' in msg:

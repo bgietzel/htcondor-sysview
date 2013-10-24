@@ -183,6 +183,11 @@ for pool_abbr, pool_name in pool_names.items():
       boinc_jobs.append(job)
       num_boinc_jobs += 1
 
+    # Default all slots to owner state, and slots with jobs will overwrite this
+    if ( k == 'slot1_State' and v.startswith("Owner")  ):
+      setattr(node, 'state', 'owner')
+      
+  
   timer.end()
 
 # SLURM
