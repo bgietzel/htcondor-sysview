@@ -33,7 +33,7 @@ for x in sys.argv:
         admin = True
         URL=BASE_URL + "/mosaic.html"
         # widescreen version for admins
-        columns=180
+        columns=120
         print "Admin version including job data"
     if x.startswith('-s'):
         sugar = True
@@ -349,7 +349,7 @@ keys = []
 for node in nodes:
     name = shortname(node)
     if debug: print "NAME is %s " % name
-    np, state, load, msg = node_info.get(name + '.info')
+    np, state, load, pool, msg = node_info.get(name + '.info')
 
     for slot in xrange(1,np+1):
         keys.append("%s.%d" % (name, slot))
@@ -364,12 +364,17 @@ keys = []
 # set up node status counts for legend
 slotdata = {green: 0, red: 0, pink:0, dkgrey: 0, black: 0, dkgreen: 0}
 
-for node in nodes:
+pool_list = sorted(pool_names.keys())
+pool_list.append('default')
+for pool_abbr in pool_list: 
+  for node in nodes:
     hostname = shortname(node)
     if debug: print "HOSTNAME is %s " % hostname
-    ncpu, state, load, msg = node_info.get(hostname + '.info')
- 
-    for slot in xrange(1, ncpu+1):
+    ncpu, state, load, pool, msg = node_info.get(hostname + '.info')
+
+    if ( pool_abbr == pool ):
+
+      for slot in xrange(1, ncpu+1):
         if debug: print "slot is %d " % slot
         color = black
         wsecs = csecs = 0

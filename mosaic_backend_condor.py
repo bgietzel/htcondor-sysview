@@ -68,6 +68,7 @@ for line in lines:
     n.np = int(np)
     n.hostname = shortname(hostname)
     n.state = 'down' 
+    n.pool = 'default'
     n.note = "" 
     nodes.append(n)
 nodes_by_name = dict([(n.hostname, n) for n in nodes])
@@ -98,7 +99,7 @@ for pool_abbr, pool_name in pool_names.items():
   node = None
   for line in lines:
     line = line.strip()
-    if not line:
+    if not line: # blank line denotes start of new node
         node = None
         continue
     if not '=' in line:
@@ -121,8 +122,10 @@ for pool_abbr, pool_name in pool_names.items():
             node = None
             continue
         node = nodes_by_name.get(shortname(hostname))
+ 
         if not node:
             print "Error: condor_status reports unknown node", hostname
+       
     elif node and not hasattr(node, k):
         setattr(node, k,v)
     elif node and k == 'NodeOnline' and v == 'true':
@@ -135,6 +138,9 @@ for pool_abbr, pool_name in pool_names.items():
         setattr(node, 'state', 'online')
     if node and k == 'State' and v == 'Owner' and (pool_abbr == 'cs' or pool_abbr == 'cae'):
         setattr(node, 'state', 'owner')
+
+    if node and (node.pool == "default"):
+        setattr(node, 'pool', pool_abbr)
 
     # find the LoadAvg
     if ( k == 'TotalLoadAvg' and node):
@@ -253,7 +259,7 @@ mc_set(CLUSTER_ID+".nodes", node_names, 0)
 
 for n in nodes:
     # info = (n.np, n.Activity.lower(), n.LoadAvg or 0, n.note)
-    info = (n.np, n.state, n.LoadAvg or 0, n.note)
+    info = (n.np, n.state, n.LoadAvg or 0, n.pool, n.note)
   
     if debug: print "SHORT HOSTNAME is %s" % (shortname(n.hostname))
     mc_set(shortname(n.hostname)+".info", info)
