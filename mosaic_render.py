@@ -32,8 +32,6 @@ for x in sys.argv:
     if x.startswith('-a'):
         admin = True
         URL=BASE_URL + "/mosaic.html"
-        # widescreen version for admins
-        columns=120
         print "Admin version including job data"
     if x.startswith('-s'):
         sugar = True
@@ -372,6 +370,12 @@ for pool_abbr in pool_list:
     if debug: print "HOSTNAME is %s " % hostname
     ncpu, state, load, pool, msg = node_info.get(hostname + '.info')
 
+    # for down hosts, try to assign the host to a pool if it has none ie. default
+    if (pool == 'default'):
+      p = hostname.split("_")[1]
+      if p in pool_list:
+        pool = p 
+ 
     if ( pool_abbr == pool ):
 
       for slot in xrange(1, ncpu+1):
