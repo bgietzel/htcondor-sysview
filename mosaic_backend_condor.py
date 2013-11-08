@@ -96,11 +96,29 @@ for pool_abbr, pool_name in pool_names.items():
   if status:
     print condor_status_cmd, "returns", status
 
+
   node = None
+  nodestate = ''
+  nodenote = ''
+  loadavg = ''
   for line in lines:
     line = line.strip()
     if not line: # blank line denotes start of new node
+        # Add node params to Node obj
+        node = nodes_by_name.get(shortname(hostname))
+        if node:
+          setattr(node, 'state', nodestate)
+          setattr(node, 'note', nodenote)
+          setattr(node, 'pool', pool_abbr)
+          setattr(node, 'LoadAvg', loadavg)
+        else:
+            print "Error: condor_status reports unknown node", hostname
+ 
         node = None
+        hostname = ''
+        nodestate = ''
+        nodenote = ''
+        loadavg = ''
         continue
     if not '=' in line:
         continue
@@ -118,33 +136,23 @@ for pool_abbr, pool_name in pool_names.items():
 
     if k == 'Machine':
         hostname = v
+
         if 'condor' in hostname: # condor_status reports on headnode, ignore it
             node = None
             continue
-        node = nodes_by_name.get(shortname(hostname))
- 
-        if not node:
-            print "Error: condor_status reports unknown node", hostname
        
-    elif node and not hasattr(node, k):
-        setattr(node, k,v)
-    elif node and k == 'NodeOnline' and v == 'true':
-        setattr(node, 'state', 'online')
-    elif node and k == 'NodeOnline' and v == 'false':
-        setattr(node, 'state', 'offline')
-    elif node and k == 'NodeOnlineReason':
-        setattr(node, 'note', v)
-    elif node and (node.state not in 'owner' and node.state not in 'offline'):
-        setattr(node, 'state', 'online')
-    if node and k == 'State' and v == 'Owner' and (pool_abbr == 'cs' or pool_abbr == 'cae'):
-        setattr(node, 'state', 'owner')
-
-    if node and (node.pool == "default"):
-        setattr(node, 'pool', pool_abbr)
+    elif k == 'NodeOnline' and v == 'true':
+        nodestate = 'online'
+    elif k == 'NodeOnline' and v == 'false':
+        nodestate = 'offline'
+    elif k == 'NodeOnlineReason':
+        nodenote = v
+    if  k == 'State' and v == 'Owner' and (pool_abbr == 'cs' or pool_abbr == 'cae'):
+        nodestate = 'owner'
 
     # find the LoadAvg
     if ( k == 'TotalLoadAvg' and node):
-        setattr(node, 'LoadAvg', v)
+        loadavg = v
 
     # Now for pslots, rename the slots
     if k == 'Name':
@@ -191,7 +199,7 @@ for pool_abbr, pool_name in pool_names.items():
 
     # Default all slots to owner state, and slots with jobs will overwrite this
     if ( k == 'slot1_State' and v.startswith("Owner")  ):
-      setattr(node, 'state', 'owner')
+      nodestate = 'owner'
       
   
   timer.end()
