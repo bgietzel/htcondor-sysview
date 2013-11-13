@@ -329,20 +329,20 @@ for server_name in server_names.keys():
     get_slot_numbers(sjobs, server_name, pool_name)
 
     # whole machine slots
-    for j in sjobs:
-      if (j.RequiresWholeMachine == 'true'):
-        hname = shortname(j.RemoteHost) 
+    #for j in sjobs:
+    #  if (j.RequiresWholeMachine == 'true'):
+    #    hname = shortname(j.RemoteHost) 
 
-        slot, h = map(string.strip, hname.split('@', 1))
-        h = hname.split('@')[1]
-        if debug: print "WHOLE MACHINE is %s" % h
-        np, state, load, pool, msg = mc_get(h + '.info')
+    #    slot, h = map(string.strip, hname.split('@', 1))
+    #    h = hname.split('@')[1]
+    #    if debug: print "WHOLE MACHINE is %s" % h
+    #    np, state, load, pool, msg = mc_get(h + '.info')
 
-        cputime = j.cputime/np   
-        for i in xrange(np+1):
-          j.cputime = cputime 
-          key = "%s.%d" % (h, i)
-          mc_set(key, j.job_id)
+    #    cputime = j.cputime/np   
+    #    for i in xrange(np+1):
+    #      j.cputime = cputime 
+    #      key = "%s.%d" % (h, i)
+    #      mc_set(key, j.job_id)
 
     jobs+=sjobs
 
