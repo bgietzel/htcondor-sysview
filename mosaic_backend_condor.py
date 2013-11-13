@@ -151,7 +151,7 @@ for pool_abbr, pool_name in pool_names.items():
         nodestate = 'owner'
 
     # find the LoadAvg
-    if ( k == 'TotalLoadAvg' and node):
+    if ( k == 'TotalLoadAvg' ):
         loadavg = v
 
     # Now for pslots, rename the slots
@@ -327,6 +327,22 @@ for server_name in server_names.keys():
 
     # dynamic slots
     get_slot_numbers(sjobs, server_name, pool_name)
+
+    # whole machine slots
+    for j in sjobs:
+      if (j.RequiresWholeMachine == 'true'):
+        hname = shortname(j.RemoteHost) 
+
+        slot, h = map(string.strip, hname.split('@', 1))
+        h = hname.split('@')[1]
+        if debug: print "WHOLE MACHINE is %s" % h
+        np, state, load, pool, msg = mc_get(h + '.info')
+
+        cputime = j.cputime/np   
+        for i in xrange(np+1):
+          j.cputime = cputime 
+          key = "%s.%d" % (h, i)
+          mc_set(key, j.job_id)
 
     jobs+=sjobs
 
