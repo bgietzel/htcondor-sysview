@@ -71,6 +71,7 @@ for line in lines:
     n.pool = 'default'
     n.note = "" 
     nodes.append(n)
+
 nodes_by_name = dict([(n.hostname, n) for n in nodes])
 
 timer.end()
@@ -83,11 +84,13 @@ timer.end()
 timer = Timer("condor_status")
 
 num_boinc_jobs = 0
+num_glidein_jobs = 0
 boinc_slot = 0
 
 for pool_abbr, pool_name in pool_names.items():
   timer = Timer("condor_status")
-
+ 
+  if verbose: print "pool abbr is %s " % pool_abbr
   condor_status_cmd = "condor_status -long -pool %s" % (pool_name)  
   print condor_status_cmd
   p = os.popen(condor_status_cmd)
@@ -104,22 +107,43 @@ for pool_abbr, pool_name in pool_names.items():
   for line in lines:
     line = line.strip()
     if not line: # blank line denotes start of new node
-        # Add node params to Node obj
-        node = nodes_by_name.get(shortname(hostname))
-        if node:
+        # If we find a glidein, create a new Node from the info
+        if (pool_abbr == 'glidein'):
+          if verbose: print "Found glidein node %s" % (ghostname) 
+          node = Node()
+          setattr(node, 'hostname', ghostname)
           setattr(node, 'state', nodestate)
           setattr(node, 'note', nodenote)
           setattr(node, 'pool', pool_abbr)
+          setattr(node, 'np', 1)
           setattr(node, 'LoadAvg', loadavg)
+          nodes.append(node)
+
+          node = None
+          ghostname = ''
+          nodestate = ''
+          nodenote = ''
+          loadavg = ''
+
         else:
-            print "Error: condor_status reports unknown node", hostname
+          node = nodes_by_name.get(shortname(hostname))
+
+          # Add node params to Node obj
+          if node:
+            setattr(node, 'state', nodestate)
+            setattr(node, 'note', nodenote)
+            setattr(node, 'pool', pool_abbr)
+            setattr(node, 'LoadAvg', loadavg)
+          else:
+              print "Error: condor_status reports unknown node", hostname
  
-        node = None
-        hostname = ''
-        nodestate = ''
-        nodenote = ''
-        loadavg = ''
-        continue
+          node = None
+          hostname = ''
+          nodestate = ''
+          nodenote = ''
+          loadavg = ''
+          continue
+
     if not '=' in line:
         continue
     k, v = map(string.strip, line.split('=', 1))
@@ -153,20 +177,35 @@ for pool_abbr, pool_name in pool_names.items():
     # find the LoadAvg
     if ( k == 'TotalLoadAvg' ):
         loadavg = v
+  
+    # find glidein params
+    if (pool_abbr == 'glidein'):
+      nodestate = 'online'
+
+      if k == 'Name':
+        ghostname = shortname(v)     
+      if k == 'GLIDEIN_ResourceName':
+        ce = v
+      if ( k == 'LoadAvg' ):
+        loadavg = v
 
     # Now for pslots, rename the slots
     if k == 'Name':
       v = str(v)
-      if ( v.find("slot1_") >= 0):
+
+      if (v.find('glidein') >= 0):
+        v = v.split('@')[0]
+        v = int(v.split('_')[1])
+      elif ( v.find("slot1_") >= 0):
         v = ''.join(v.split('1_', 1))
-      if ( v.find("slot3_") >= 0):
+      elif ( v.find("slot3_") >= 0):
         v = ''.join(v.split('3_', 1))
-      if ( v.find("slot5_") >= 0):
+      elif ( v.find("slot5_") >= 0):
         v = ''.join(v.split('5_', 1))
       if debug: print 'SLOTNUMBER is %s' % v
 
       # boinc jobs get info from the execute machine not submitter
-      if ( v.find("@") >= 0 ):
+      if (str(v).find('glidein') <= 0 and str(v).find("@") >= 0 ):
           try:
             vslot = v.split()[0].split('@')[0]
             if debug: print "vslot is %s " % vslot
@@ -244,6 +283,8 @@ for line in slurm_arr:
 print "NUM BOINC JOBS: %s " % num_boinc_jobs
 print "NUM SLURM JOBS: %s " % num_slurm_jobs
 
+# recalculate nodes_by_name after adding glidein hosts
+nodes_by_name = dict([(n.hostname, n) for n in nodes])
 # hosts are online by default
 node_names = nodes_by_name.keys()
 node_names.sort()
@@ -268,7 +309,7 @@ mc_set(CLUSTER_ID+".nodes", node_names, 0)
 for n in nodes:
     # info = (n.np, n.Activity.lower(), n.LoadAvg or 0, n.note)
     info = (n.np, n.state, n.LoadAvg or 0, n.pool, n.note)
-  
+
     if debug: print "SHORT HOSTNAME is %s" % (shortname(n.hostname))
     mc_set(shortname(n.hostname)+".info", info)
 
@@ -295,7 +336,9 @@ for server_name in server_names.keys():
     job_info = []
     sjobs=[]
 
-    for line in lines[3:]: # Skip over headers
+    # there's no local schedd for the glidein pool. glideins flock from other submitters.
+    if ( pool_name.find('glidein') < 0):
+      for line in lines[3:]: # Skip over headers
         line = line.strip()
 
         if ( string.find( line, "GlobalJobId") > 0):
@@ -332,9 +375,14 @@ for server_name in server_names.keys():
     #for j in sjobs:
     #  if (j.RequiresWholeMachine == 'true'):
     #    hname = shortname(j.RemoteHost) 
-
-    #    slot, h = map(string.strip, hname.split('@', 1))
-    #    h = hname.split('@')[1]
+    #    print "whole machine is %s " % hname
+     
+    #    if (hname.find("@") >= 1):
+          #slot, h = map(string.strip, hname.split('@', 1))
+    #      h = hname.split('@')[1]
+    #    else:
+    #      h = hname
+    #     
     #    if debug: print "WHOLE MACHINE is %s" % h
     #    np, state, load, pool, msg = mc_get(h + '.info')
 
@@ -370,45 +418,70 @@ except IndexError, e:
 
 jobs_by_node_slot = {}
 for job in jobs:
-    try:
+
+    # for glideins use the entire part of the host
+    if ( job.RemoteHost.find('glidein') >= 0):
+      try:
+        hostname = job.RemoteHost
+        slot = hostname.split('@')[0].split('_')[1]
+        num_glidein_jobs += 1
+      except:
+        continue
+
+    else:
+      try:
         slot, hostname = map(string.strip, job.RemoteHost.split('@'))
-    except:
+      except:
         continue
     hostname = shortname(hostname)
-    if debug: print 'hostname is %s' % hostname
-    if debug: print 'slot name is %s' % slot
-    if ( slot.find("slot1_") >= 0 or slot.find("slot3_") >= 0 or slot.find("slot5_") >= 0 ):
-      slot = int(slot[6:])
-    elif ( slot.find("slot") >= 0):
-      slot = int(slot[4:])
-    else:
-      slot = 0
+ 
+    # glideins always run on slot1 so use glidein id as slot
+    # eg. hostname is glidein_123@nb-somehost_someu_edu, jobid is 1.123, slot is 123
+    if (hostname.find('glidein') < 0):
+      if ( slot.find("slot1_") >= 0 or slot.find("slot3_") >= 0 or slot.find("slot5_") >= 0 ):
+        slot = int(slot[6:])
+      elif ( slot.find("slot") >= 0):
+        slot = int(slot[4:])
+      else:
+        slot = 0
     if debug: print 'slot number is %s' % slot
 
-    # now set this in mc
-    key = "%s.%d" % (shortname(hostname), slot)
+    if verbose: print 'hostname is %s, slot is %s:' % (hostname, slot)
+    key = "%s.%d" % (shortname(hostname), int(slot))
     mc_set(key, job.job_id)
 
 
-key = "%s.%d" % (hostname, slot)
+key = "%s.%d" % (hostname, int(slot))
 if debug: print "KEY is %s" % key
 multi[key] = job.job_id
 jobs_by_node_slot[(hostname, slot)] = job.job_id
 
 mc_set_multi(multi)
 timer.end()
+ 
+print "NUM GLIDEIN JOBS: %s " % num_glidein_jobs
 
 # Set completed jobs with low TTL so they expire from memcachea
 # TODO find correct TTL time and implement
+# TTODO is this code still needed as we have a lower TTL now?
 timer = Timer("clear completed jobs")
 for node in nodes:
     hostname = shortname(node.hostname)
-    for slot in xrange(node.np+1):
+    if (hostname.find('glidein') < 0):
+      for slot in xrange(node.np+1):
         if (hostname, slot) not in jobs_by_node_slot:
             if debug: print "HS is %s %d " % (hostname, slot)
             key = "%s.%d" % (shortname(hostname), slot)
             #mc_set(key, job)
             #mc_set(key, job.job_id)
+    # glidein jobs have different host/slot patterns
+    else:
+        slot = hostname.split('@')[0].split('_')[1]
+        if (hostname, slot) not in jobs_by_node_slot:
+            if debug: print "HS is %s %d " % (hostname, slot)
+            key = "%s.%d" % (shortname(hostname), int(slot))
+ 
+
 timer.end()
 
 

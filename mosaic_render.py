@@ -10,13 +10,15 @@ import sys, os, re, time, string
 import memcache
 
 
-legend_height = 300
+legend_height = 350
+#legend_height = 300
 
 mc = None
 verbose = 0
 debug = 0
 admin = False
 sugar = False
+glidein = False
 print_times = False
 
 for x in sys.argv:
@@ -37,6 +39,15 @@ for x in sys.argv:
         sugar = True
         URL=BASE_URL + "/sugar.html"
         print "Only show active cpus"
+    if x.startswith('-g'):
+        glidein = True
+        num_glidein_jobs = 0
+        num_glidein_hosts = 0
+        legend_height = 150
+        columns = 80
+        URL=BASE_URL + "/glidein.html"
+        print "Only show glidein cpus"
+
 
 
 print "CLUSTER_ID is %s " % CLUSTER_ID
@@ -68,7 +79,7 @@ def img(ostream, arg, width, height, left, top, name=None, text=None, link=None)
         print "???", arg
         return
         
-    if text and admin:
+    if text and (admin or glidein):
         ostream.write("<div id='%s.msg' class='xstooltip' style='left: %dpx; top:%dpx;'\n" % (name, left+16, top+16))
         ostream.write("<b>%s</b></br>" % name)
         for line in text:
@@ -81,15 +92,15 @@ def img(ostream, arg, width, height, left, top, name=None, text=None, link=None)
         ostream.write("<img src=%s width=%d height=%d style='position:absolute; left:%dpx; top:%dpx'" % (img, width, height, left, top))
     else:
         ostream.write("<div style='background-color:#%02x%02x%02x; width:%dpx; height:%dpx; position:absolute; left:%dpx; top:%dpx'" % (r,g,b, width, height, left, top))
-    if name and admin:
+    if name and (admin or glidein):
         ostream.write(" id='%s.div'\n" % name)
-    if text and admin:
+    if text and (admin or glidein):
         ostream.write(" onmouseover=\"xstooltip_show(\'%s.msg\', \'%s.div\', %d, %d)\"\n" % (name, name, left+16, top+16))
         ostream.write(" onmouseout=\"xstooltip_hide(\'%s.msg\');\"\n" % name)
         ostream.write(" onclick=\"xstooltip_click(\'%s.msg\', \'%s\');\"\n" % (name, link or ''))
     ostream.write("/>\n")
 
-    if ( dot_type and admin): 
+    if ( dot_type and (admin or glidein)): 
         ostream.write("<img src=../images/%s.png>" % dot_type)
     if not img:
         ostream.write("</div>")
@@ -196,9 +207,10 @@ def mkpage(data, filename):
     effcy = int(float(efile.readline()))
     efile.close()
 
-    effcy_png = WEBDIR + '/effcy.png'
-    os.system("convert xc:black -resize %dx64! -fill \#0000ff -pointsize 60 -gravity West -draw \"text %d,0 '%s'\" %s "%(eff_width,eff_offset,effcy,effcy_png))
-    print "Cluster efficiency is %s percent" % effcy 
+    if not glidein:
+      effcy_png = WEBDIR + '/effcy.png'
+      os.system("convert xc:black -resize %dx64! -fill \#0000ff -pointsize 60 -gravity West -draw \"text %d,0 '%s'\" %s "%(eff_width,eff_offset,effcy,effcy_png))
+      print "Cluster efficiency is %s percent" % effcy 
 
     # draw the date as a png 
     label_png = WEBDIR + '/label.png'
@@ -207,20 +219,42 @@ def mkpage(data, filename):
     img(o, "label.png", width, height, x, y + legend_height)
     o.write("</div>\n<div>")
     elink = BASE_URL + '/jobinfo/userjobs7.html'
-    if (admin):
+    if admin:
       img(o, "effcy.png", eff_width,eff_height, x + 700, y + height + legend_height, "effcy", "effcy", link = elink )
-    else:  
+    elif not glidein:  
       img(o, "effcy.png", eff_width,eff_height, x + 700, y + height + legend_height, "effcy", "effcy", link = None )
 
     # write out legend at the top
     curr_height = 0 
-    text = "Each square represents a core in the %s pool" % CLUSTER_ID
-    my_png = "%s/text.png" % (WEBDIR)
-    os.system("convert xc:black -resize %dx64! -fill \%s -pointsize 60 -gravity West -draw \"text %d,0 '%s'\" %s "%( eff_width * 12, "grey", eff_offset, text, my_png))
-    img(o, "text.png", eff_width * 9, eff_height, margin + 250, curr_height )
+    if not glidein:
+      text = "Each square represents a core in the %s pool" % CLUSTER_ID
+      my_png = "%s/text.png" % (WEBDIR)
+      os.system("convert xc:black -resize %dx64! -fill \%s -pointsize 60 -gravity West -draw \"text %d,0 '%s'\" %s "%( eff_width * 12, "grey", eff_offset, text, my_png))
+      img(o, "text.png", eff_width * 9, eff_height, margin + 250, curr_height )
+
+    elif glidein: 
+      text1 = "Glidein Pool"
+      my_png = "%s/text1.png" % (WEBDIR)
+      os.system("convert xc:black -resize %dx64! -fill \%s -pointsize 60 -gravity West -draw \"text %d,0 '%s'\" %s "%( eff_width * 12, "grey", eff_offset, text1, my_png))
+      img(o, "text1.png", eff_width * 9, eff_height, margin + 250, curr_height )
+
     curr_height = curr_height + eff_height 
 
-    slotdesc = {green: "busy", red: "down", dkgrey: "owner", pink: "offline", black: "idle", dkgreen: "backfill"}
+    slotdesc = {green: "busy", red: "down", dkgrey: "owner", pink: "offline", black: "idle", dkgreen: "backfill", yellow: "glidein", dkyellow: "unclaimed" }
+
+    # remove all other slot info for glideins
+    if glidein:
+      
+      num_glidein_jobs = slotdata[yellow]
+      print "Of %s total glidein hosts, %s are busy" % (num_glidein_hosts, num_glidein_jobs)
+      slotdata.clear()
+      num_glidein_idle = int(num_glidein_hosts) - int(num_glidein_jobs)
+      slotdata[yellow] = num_glidein_jobs
+      # use a diff color for idle glidein nodes as not to confuse regular idle jobs
+      slotdata[dkyellow] = num_glidein_idle
+    else: 
+      del slotdata[yellow]
+      del slotdata[dkyellow]
 
     # render each legend item as a png and display it.
     for color in slotdata.keys():
@@ -349,7 +383,8 @@ for node in nodes:
     if debug: print "NAME is %s " % name
     np, state, load, pool, msg = node_info.get(name + '.info')
 
-    for slot in xrange(1,np+1):
+    # glidein jobs all report as slot1 se we need to find the slot later from the hostname
+    for slot in xrange(1, np+1):
         keys.append("%s.%d" % (name, slot))
 
 timer = Timer("get job slot info")
@@ -360,11 +395,12 @@ timer = Timer("munge data")
 keys = []
 
 # set up node status counts for legend
-slotdata = {green: 0, red: 0, pink:0, dkgrey: 0, black: 0, dkgreen: 0}
+slotdata = {green: 0, red: 0, pink:0, dkgrey: 0, black: 0, dkgreen: 0, yellow: 0, dkyellow: 0}
 
 pool_list = sorted(pool_names.keys())
 pool_list.append('default')
 for pool_abbr in pool_list: 
+  if verbose: print "pool_abbr is %s" % pool_abbr
   for node in nodes:
     hostname = shortname(node)
     if debug: print "HOSTNAME is %s " % hostname
@@ -375,11 +411,12 @@ for pool_abbr in pool_list:
       p = hostname.split("_")[1]
       if p in pool_list:
         pool = p 
- 
-    if ( pool_abbr == pool ):
 
+    # non-glidein hosts 
+    if (pool != 'glidein' and pool_abbr == pool and glidein == False): 
       for slot in xrange(1, ncpu+1):
         if debug: print "slot is %d " % slot
+
         color = black
         wsecs = csecs = 0
         dot_type = ''
@@ -387,7 +424,7 @@ for pool_abbr in pool_list:
 
         text = []
         slotname = "%s/%s" % (hostname, slot)
-        job = slot_info.get("%s.%d" % (hostname, slot))
+        job = slot_info.get("%s.%d" % (hostname, int(slot)))
 
         if job:
             if verbose:
@@ -443,18 +480,15 @@ for pool_abbr in pool_list:
               dot_type = 'b'
               color = rgb(7200, 7200)
               effcy = 100
-              
               slotdata[dkgreen] += 1
-          
+         
             # is this a slurm job?
             if ( job.endswith(".")):
               if debug: print "slurm job %s" % job
               dot_type = 's'
               color = rgb(7200, 7200)
               effcy = 100
-              
               slotdata[dkgreen] += 1
-
 
             if debug: print "dot_type is %s" % dot_type
  
@@ -506,7 +540,7 @@ for pool_abbr in pool_list:
         if sugar:
           if color not in (black, red):
             data.append((slotname, color, dot_type, text, link))
-        else:
+        elif not glidein:
           data.append((slotname, color, dot_type, text, link))
 
         if verbose: print "slotname %s " % (slotname)    
@@ -517,6 +551,85 @@ for pool_abbr in pool_list:
         if (color == black):
           slotdata[black] += 1
 
+    # ensure we have a glidein by looking at the hostname
+    elif ( pool_abbr == 'glidein' and pool == 'glidein' and glidein):
+      # glideins always run on slot1 so use glidein id as slot
+      # eg. hostname is glidein_123@nb-somehost_someu_edu, jobid is 1.123, slot is 123
+      if (hostname.find('glidein') >= 0):
+        tmp = hostname.split('@')[0]
+        slot = tmp.split('_')[1]
+        num_glidein_hosts += 1
+
+        if verbose: print "hostname is %s and slot is %s" % ( hostname, slot) 
+
+        color = black
+        wsecs = csecs = 0
+        dot_type = ''
+        link = None
+
+        text = []
+
+        key = "%s.%d" % (shortname(hostname), int(slot))
+        job = mc_get(key)
+
+        if job:
+          if verbose:
+            print "HAVE GLIDEIN JOB %s" % job
+ 
+          # TODO this code is duplicated from above, clean it up 
+          wsecs, csecs = job_times.get("%s.times"%job, (0,0))
+          prev_wsecs, prev_csecs = job_prev_times.get("%s.prev_times"%job, (0,0))
+          rss, vm = job_mem.get("%s.mem"%job, ('0','0'))
+          walltime = cputime = "???" # display string
+          if verbose: print "WALLTIME %s " % walltime
+          
+          # TODO diff icons for each CE 
+          #dot_type = job_types.get('%s.type' % job)
+          dot_type = 'G'
+
+          if wsecs and prev_wsecs:
+                wsecs -= prev_wsecs
+          if csecs and prev_csecs:
+                csecs -= prev_csecs
+ 
+          if wsecs < 0:
+                wsecs=0.01
+          if csecs < 0:
+                csecs=0
+
+          link = 'jobinfo/%s.html' % job
+
+          if state not in ('free', 'job-exclusive'):
+                text.append(state)
+          if vm and rss:
+                text += ['rss %s vm %s' %(rss, vm)]
+          if prev_wsecs:
+                walltime = "%s (-%s)" % (HMS(wsecs), HMS(prev_wsecs))
+          else:
+                walltime = HMS(wsecs)
+          if prev_csecs:
+                cputime = "%s (-%s)" % (HMS(csecs), HMS(prev_csecs))
+          else:
+                cputime = HMS(csecs)
+          text += ['wall time %s'%walltime, 'cpu time %s'%cputime]
+          if wsecs == 0:
+                wsecs = 1
+          effcy = 100.0 * csecs / wsecs
+          if walltime != '???' and cputime != '???':
+                text.append('cpu efficiency  %.1f%%' %effcy)
+
+          color = rgb(wsecs, csecs)
+          slotdata[yellow] += 1
+
+        else:
+          wsecs = csecs = 0
+          link = 'job_info/UNAVAILABLE'
+          text.append(state)
+          if (color == black):
+            slotdata[black] += 1
+
+        data.append((slot, color, dot_type, text, link))
+
 timer.end()
 
 timer = Timer("mkpage")
@@ -524,6 +637,8 @@ if sugar:
   filename = WEBDIR + '/sugar.html'
 elif admin:
   filename = WEBDIR + '/mosaic.html'
+elif glidein:
+  filename = WEBDIR + '/glidein.html'
 else:
   filename = WEBDIR + '/sysview.html'
 mkpage(data, filename)
