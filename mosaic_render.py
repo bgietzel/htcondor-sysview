@@ -556,6 +556,7 @@ for pool_abbr in pool_list:
       # glideins always run on slot1 so use glidein id as slot
       # eg. hostname is glidein_123@nb-somehost_someu_edu, jobid is 1.123, slot is 123
       if (hostname.find('glidein') >= 0):
+        host = hostname.split('@')[1]
         tmp = hostname.split('@')[0]
         slot = tmp.split('_')[1]
         num_glidein_hosts += 1
@@ -583,9 +584,7 @@ for pool_abbr in pool_list:
           walltime = cputime = "???" # display string
           if verbose: print "WALLTIME %s " % walltime
           
-          # TODO diff icons for each CE 
-          #dot_type = job_types.get('%s.type' % job)
-          dot_type = 'G'
+          dot_type = job_types.get('%s.type' % job)
 
           if wsecs and prev_wsecs:
                 wsecs -= prev_wsecs
@@ -618,6 +617,13 @@ for pool_abbr in pool_list:
           if walltime != '???' and cputime != '???':
                 text.append('cpu efficiency  %.1f%%' %effcy)
 
+          user = job_users.get('%s.user'%job, None)
+          if verbose: print "USER is %s " % user
+          if user:
+              if user.endswith("@somedomain.org"):
+                  user = user.split('@')[0]
+              text.insert(0, "<b>user: %s</b>" % user)
+
           color = rgb(wsecs, csecs)
           slotdata[yellow] += 1
 
@@ -628,7 +634,8 @@ for pool_abbr in pool_list:
           if (color == black):
             slotdata[black] += 1
 
-        data.append((slot, color, dot_type, text, link))
+        slotname = "%s/%s" % (host, slot)
+        data.append((slotname, color, dot_type, text, link))
 
 timer.end()
 
