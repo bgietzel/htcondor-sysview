@@ -1,4 +1,4 @@
-# Set NodeOnline = True if disk space requirements are met.
+# Set NodeOnline to True if node_check requirements are met.
 
 SETTABLE_ATTRS_ADMINISTRATOR = $(SETTABLE_ATTRS_ADMINISTRATOR) NodeOnline
 ENABLE_RUNTIME_CONFIG = True

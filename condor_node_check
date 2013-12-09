@@ -3,60 +3,56 @@
 #  Worker node health check script, to run from condor startd
 
 from mc_util import *
-import sys, os
+import sys, os, stat
 import memcache
 import socket
 import subprocess
 
+
+## get host info
 hostname = socket.gethostname() 
 node = shortname(hostname)
 
-#
-# define directories to test
-# 
-SCRATCH = "/scratch"
-TMP = "/tmp"
-SLASH = "/"
-FNAME = "node_check"
+
+## Define directories to test
+SCRATCH_DIR = "/scratch"
+TMP_DIR = "/tmp"
+ROOT_DIR = "/"
+TMP_FILE = "node_check"
+EXE_DIR = "/var/lib/condor/execute"
 
 
+## Memcache subroutines
 def setOffline(msg):
-   mc_set( node+".status", "offline")
-   mc_set( node+".message", msg)
-   print "NodeOnline = False"
-   print "NodeOfflineReason = %s" % msg
+   print """NodeOnline = false"""
+   print """NodeOnlineReason = '%s'""" % (msg)
 
 def setOnline():
-   mc_set( node+".status", "online")
-   print "NodeOnline = True"
+   print """NodeOnline = true"""
 
 
-# Test if the node has been set offline manually
-MANUALSTATUS = mc_get( node+".manualstatus" )
-
-if MANUALSTATUS == 'offline':
-    MANUALREASON = mc_get( node+".manualreason" )
-    setOffline("Manual offline: %s " % MANUALREASON)
+## Test if the node has been set offline manually
+STATUS = mc_get( node+".manualstatus" )
+if STATUS == 'offline':
     sys.exit()
-#
-# TESTS
-#
+
+
+## Tests
 def can_write( mypath, myfile ):
   if os.path.exists( "%s" % (mypath) ):
     if not os.path.isfile( "%s/%s" % (mypath, myfile) ):
       if ( open( "%s/%s" % (mypath, myfile), 'w').close() ):
-        setOffline("cannot write to %s" % mypath) 
+        setOffline("Cannot write to %s" % mypath) 
         sys.exit()
       else:
-        if debug: print "can write to %s" % mypath
         os.remove( "%s/%s" % (mypath, myfile))
 
-def correct_perms( mypath, myperms):
+def correct_perms( mypath, perms):
   if os.path.exists( "%s" % (mypath) ):
-    PERMS = os.stat(mypath).st_mode
-    if not ( PERMS & 0777 == 1777 ):
-      setOffline("permissions on %s should be 1777, are %s" % mypath, PERMS)
-      if debug: print "permissions on %s should be 1777, are %s" % (mypath, PERMS)
+    PERMS = oct(os.stat(mypath).st_mode)[-4:]
+ 
+    if ( int(PERMS) & 0777  == perms ):
+      setOffline("Permissions on %s should be 1777, are %s" % (mypath, PERMS))
       sys.exit()
 
 def disk_free ( mypath, amount ):  
@@ -65,21 +61,19 @@ def disk_free ( mypath, amount ):
     output = df.communicate()[0]
     device, size, used, available, percent, mountpoint = output.split("\n")[1].split()
 
-    available = available.split(".")[0]
+    available = available.split(".")[0].replace('G', '') 
 
-    if ( available < amount ):
-      setOffline("%s disk space available is %s GB" % mypath, available)
+    if ( int(available) < int(amount) ):
+      setOffline("Disk space available on %s is %s GB" % (mypath, available))
       sys.exit()
 
 
-##
-# run the checks
-## 
-# can_write( SCRATCH )
-# can_write( TMP )
-# correct_perms( SCRATCH )
-# disk_free ( SCRATCH, 5 )
-# disk_free ( SLASH, 5 )
+## run the checks
+can_write( TMP_FILE, EXE_DIR )
+correct_perms( EXE_DIR, 1777)
+disk_free ( ROOT_DIR, 5 )
 
+
+## if we pass all the checks, set the node to online status
 setOnline()
 sys.exit()
