@@ -71,7 +71,8 @@ def disk_free ( mypath, amount ):
 ## run the checks
 can_write( TMP_FILE, EXE_DIR )
 correct_perms( EXE_DIR, 1777)
-disk_free ( ROOT_DIR, 5 )
+disk_free( ROOT_DIR, 5 )
+disk_free( EXE_DIR, 5 )
 
 
 ## if we pass all the checks, set the node to online status
