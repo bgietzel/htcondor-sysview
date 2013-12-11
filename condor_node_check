@@ -61,18 +61,20 @@ def disk_free ( mypath, amount ):
     output = df.communicate()[0]
     device, size, used, available, percent, mountpoint = output.split("\n")[1].split()
 
-    available = available.split(".")[0].replace('G', '') 
-
-    if ( int(available) < int(amount) ):
-      setOffline("Disk space available on %s is %s GB" % (mypath, available))
-      sys.exit()
+    if available.find('T') >= 0:
+      next
+    else:
+      available = available.replace('G', '') 
+      if ( int(available) < int(amount) ):
+        setOffline("Disk space available on %s is %s GB" % (mypath, available))
+        sys.exit()
 
 
 ## run the checks
 can_write( TMP_FILE, EXE_DIR )
 correct_perms( EXE_DIR, 1777)
-disk_free( ROOT_DIR, 5 )
-disk_free( EXE_DIR, 5 )
+disk_free( ROOT_DIR, 5 ) # unit is GB
+disk_free( EXE_DIR, 5 )  # unit is GB
 
 
 ## if we pass all the checks, set the node to online status
