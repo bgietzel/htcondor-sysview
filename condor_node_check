@@ -64,7 +64,7 @@ def disk_free ( mypath, amount ):
     if available.find('T') >= 0:
       next
     else:
-      available = available.replace('G', '') 
+      available = available.split(".")[0].replace('G', '') 
       if ( int(available) < int(amount) ):
         setOffline("Disk space available on %s is %s GB" % (mypath, available))
         sys.exit()
