@@ -44,7 +44,7 @@ for x in sys.argv:
         num_glidein_jobs = 0
         num_glidein_hosts = 0
         legend_height = 150
-        columns = 80
+        columns = 120
         URL=BASE_URL + "/glidein.html"
         print "Only show glidein cpus"
 
@@ -187,6 +187,14 @@ def mkpage(data, filename):
 
             # leave room for the legend at top
             name, (r,g,b), dot_type, text, link = data[n]
+
+            # try changing bgcolor to yellow if glidein
+            if glidein:
+              img(o, yellow,
+                size+2, size+2,
+                margin+border_width+spacing+x*(size+spacing)-1,
+                margin+border_width+spacing+y*(size+spacing) + legend_height + 1)
+
             img(o, (r,g,b,dot_type),
                 size, size,
                 margin+border_width+spacing+x*(size+spacing),
@@ -413,7 +421,7 @@ for pool_abbr in pool_list:
         pool = p 
 
     # non-glidein hosts 
-    if (pool != 'glidein' and pool_abbr == pool and glidein == False): 
+    if (pool != 'glidein' and pool != 'glidein2' and pool_abbr == pool and glidein == False): 
       for slot in xrange(1, ncpu+1):
         if debug: print "slot is %d " % slot
 
@@ -552,16 +560,28 @@ for pool_abbr in pool_list:
           slotdata[black] += 1
 
     # ensure we have a glidein by looking at the hostname
-    elif ( pool_abbr == 'glidein' and pool == 'glidein' and glidein):
+    elif ( pool_abbr.startswith('glidein') and pool.startswith('glidein') and glidein):
       # glideins always run on slot1 so use glidein id as slot
       # eg. hostname is glidein_123@nb-somehost_someu_edu, jobid is 1.123, slot is 123
       if (hostname.find('glidein') >= 0):
-        host = hostname.split('@')[1]
-        tmp = hostname.split('@')[0]
+        # some glidein hosts now have slot information included
+        # slot8@glidein_55654@some.host.edu
+        if ( hostname.count('@') == 2 ):
+          host = hostname.split('@')[2]
+          tmp = hostname.split('@')[1]
+        else:
+          host = hostname.split('@')[1]
+          tmp = hostname.split('@')[0]
+
         slot = tmp.split('_')[1]
+
         num_glidein_hosts += 1
 
         if verbose: print "hostname is %s and slot is %s" % ( hostname, slot) 
+
+        # find which CE the glidein host belongs to 
+        domain = host.split("_")[-1]
+        #ce = get_ce(domain) 
 
         color = black
         wsecs = csecs = 0
