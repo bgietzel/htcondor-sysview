@@ -108,7 +108,7 @@ for pool_abbr, pool_name in pool_names.items():
     line = line.strip()
     if not line: # blank line denotes start of new node
         # If we find a glidein, create a new Node from the info
-        if (pool_abbr == 'glidein'):
+        if (pool_abbr.startswith('glidein')):
           if verbose: print "Found glidein node %s" % (ghostname) 
           node = Node()
           setattr(node, 'hostname', ghostname)
@@ -179,7 +179,7 @@ for pool_abbr, pool_name in pool_names.items():
         loadavg = v
   
     # find glidein params
-    if (pool_abbr == 'glidein'):
+    if (pool_abbr.startswith('glidein')):
       nodestate = 'online'
 
       if k == 'Name':
@@ -194,7 +194,12 @@ for pool_abbr, pool_name in pool_names.items():
       v = str(v)
 
       if (v.find('glidein') >= 0):
-        v = v.split('@')[0]
+        # some glidein hosts now have slot information included
+        # slot8@glidein_55654@some.host.edu
+        if ( v.count('@') == 2 ):
+          v = v.split('@')[1]
+        else:
+          v = v.split('@')[0]
         v = int(v.split('_')[1])
       elif ( v.find("slot1_") >= 0):
         v = ''.join(v.split('1_', 1))
@@ -209,15 +214,16 @@ for pool_abbr, pool_name in pool_names.items():
           try:
             vslot = v.split()[0].split('@')[0]
             if debug: print "vslot is %s " % vslot
+            if ( vslot.find("slot1_") >= 0 or vslot.find("slot3_") >= 0 or vslot.find("slot5_") >= 0 ):
+              boinc_slot = int(vslot[6:])
+            elif ( vslot.find("slot") >= 0):
+              boinc_slot = int(vslot[4:])
+            else:
+              boinc_slot = int(0)
           except KeyError, e:
             if verbose: print "slotid NOTFOUND"
+            boinc_slot = int(0)
 
-      if ( vslot.find("slot1_") >= 0 or vslot.find("slot3_") >= 0 or vslot.find("slot5_") >= 0 ):
-        boinc_slot = int(vslot[6:])
-      elif ( vslot.find("slot") >= 0):
-        boinc_slot = int(vslot[4:])
-      else:
-        boinc_slot = int(0)
       if debug: print 'boinc slot number is %d' % boinc_slot
 
     # now set for boinc
@@ -416,6 +422,7 @@ try:
 except IndexError, e:
     pass
 
+debug_dict = {}
 jobs_by_node_slot = {}
 for job in jobs:
 
@@ -423,7 +430,14 @@ for job in jobs:
     if ( job.RemoteHost.find('glidein') >= 0):
       try:
         hostname = job.RemoteHost
-        slot = hostname.split('@')[0].split('_')[1]
+
+        if ( hostname.count('@') == 2 ):
+          slot = hostname.split('@')[1].split('_')[1]
+        else:
+          slot = hostname.split('@')[0].split('_')[1]
+
+        debug_dict[slot] = 1 
+        if verbose: print "%s" % slot
         num_glidein_jobs += 1
       except:
         continue
@@ -446,7 +460,7 @@ for job in jobs:
         slot = 0
     if debug: print 'slot number is %s' % slot
 
-    if verbose: print 'hostname is %s, slot is %s:' % (hostname, slot)
+    #if verbose: print 'hostname is %s, slot is %s' % (hostname, slot)
     key = "%s.%d" % (shortname(hostname), int(slot))
     mc_set(key, job.job_id)
 
@@ -460,6 +474,7 @@ mc_set_multi(multi)
 timer.end()
  
 print "NUM GLIDEIN JOBS: %s " % num_glidein_jobs
+print "UNIQUE GLIDEIN JOBS: %s " % len(debug_dict)
 
 # Set completed jobs with low TTL so they expire from memcachea
 # TODO find correct TTL time and implement
@@ -476,7 +491,13 @@ for node in nodes:
             #mc_set(key, job.job_id)
     # glidein jobs have different host/slot patterns
     else:
-        slot = hostname.split('@')[0].split('_')[1]
+        # some glidein hosts now have slot information included
+        # slot8@glidein_55654@some.host.edu
+        if ( hostname.count('@') == 2 ):
+          slot = hostname.split('@')[1].split('_')[1]
+        else:
+          slot = hostname.split('@')[0].split('_')[1]
+
         if (hostname, slot) not in jobs_by_node_slot:
             if debug: print "HS is %s %d " % (hostname, slot)
             key = "%s.%d" % (shortname(hostname), int(slot))
