@@ -41,7 +41,7 @@ node_info = mc_get_multi(keys)
 for node in nodes:
     hostname = shortname(node)
     if debug: print "HOSTNAME is %s " % hostname
-    ncpu, state, load, msg = node_info.get(hostname + '.info')
+    ncpu, state, load, pool, msg = node_info.get(hostname + '.info')
 
     for slot in xrange(1, ncpu+1):
 
