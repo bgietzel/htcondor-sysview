@@ -11,7 +11,7 @@ done
 N=$i
 
 echo P6 > $o
-columns=64
+columns=160
 rows=$((N / columns))
 ((N % columns)) && ((++rows))
 line_width=1
