@@ -24,6 +24,9 @@ def shortname(hostname):
     return hostname.replace(".","_")
 #    return hostname.split('.')[0]
 
+def longname(hostname):
+    return hostname.replace("_",".")
+
 def mc_init():
     global mc
     if not mc:
