@@ -8,6 +8,8 @@ from condor_util import *
 from mc_util import *
 import sys, os, re, time, string
 import memcache
+import json
+import socket
 
 
 legend_height = 350
@@ -19,6 +21,8 @@ debug = 0
 admin = False
 sugar = False
 glidein = False
+wantjson = False
+cave = False
 print_times = False
 
 for x in sys.argv:
@@ -39,6 +43,12 @@ for x in sys.argv:
         sugar = True
         URL=BASE_URL + "/sugar.html"
         print "Only show active cpus"
+    if x.startswith('-j'):
+        wantjson = True
+        print "write results to json file"
+    if x.startswith('-c'):
+        cave = True
+        print "write files for cave"
     if x.startswith('-g'):
         glidein = True
         num_glidein_jobs = 0
@@ -293,6 +303,101 @@ def mkpage(data, filename):
     o.close()
     os.rename(filename + '.tmp', filename)
 
+
+def mkjson(data, filename):
+  with open(filename, 'w') as outfile:
+    json.dump(data, outfile)
+    #name, (r,g,b), dot_type, text, link = data[n]
+
+
+# write out text file  
+def mkjsonfile(data, filename):
+
+  o = open(filename, 'w')
+
+  for msd in data:
+    n = msd['name']
+    c = msd['children']
+
+    n = longname(n)
+    #glidein.16805@some.host.edu
+    if (n.find("glidein") >= 0):
+      n = n.split('@')[1]
+
+    if debug: print "host is %s" % n
+    addr = "0.0.0.0"
+    if ( n != "test"):
+      try: 
+        addr = socket.gethostbyname(n)
+   
+      except socket.gaierror, e:
+        addr = "0.0.0.0"
+    
+    if debug: print "addr is %s" % addr
+
+    for j in c:
+      if (j['user'] == ""): 
+        j['user'] = "X"
+      s = " %s %s %s %s %s " % (j['name'], j['user'], j['rr'], j['gg'], j['bb'])
+      o.write(n)
+      o.write(s)
+      o.write(addr)
+      o.write("\n")
+  o.close()
+
+
+# write out file for nodes
+def mknodefile(data, filename):
+
+  o = open(filename, 'w')
+
+  for node in nodes:
+    n = shortname(node)
+    np, state, load, pool, msg = node_info.get(n + '.info')
+
+    if ( state == ""):
+      state = "online"
+ 
+    n = longname(node)
+    #glidein.16805@some.host.edu
+    if (n.find("glidein") >= 0):
+      n = n.split('@')[1]
+
+    if debug: print "host is %s" % n
+
+    addr = "0.0.0.0"
+    if ( n != "test"):
+      try: 
+        addr = socket.gethostbyname(n)
+      except socket.gaierror, e:
+        addr = "0.0.0.0"
+    
+    if debug: print "addr is %s" % addr
+
+    stats = "%s %s %s %s %s " % (n, np, state, load, pool)
+    o.write(stats)
+    o.write(addr)
+    o.write("\n")
+  o.close()
+
+def mkslotfile(data, filename):
+
+  o = open(filename, 'w')
+
+  for msd in data:
+    n = msd['name']
+    c = msd['children']
+
+    if debug: print "slothost is %s" % n
+
+    for j in c:
+      if (j['user'] == ""): 
+        j['user'] = "X"
+      s = " %s %s %s %s " % (j['name'], j['user'], j['c'], j['w'])
+      o.write(n)
+      o.write(s)
+      o.write("\n")
+
 def hsl2rgb(h,s,l):
 ##  http://en.wikipedia.org/wiki/HSL_and_HSV#Conversion_from_HSL_to_RGB
     if l < 0.5:
@@ -404,6 +509,9 @@ keys = []
 
 # set up node status counts for legend
 slotdata = {green: 0, red: 0, pink:0, dkgrey: 0, black: 0, dkgreen: 0, yellow: 0, dkyellow: 0}
+
+myhost = "test"
+myslots = []
 
 pool_list = sorted(pool_names.keys())
 pool_list.append('default')
@@ -548,6 +656,31 @@ for pool_abbr in pool_list:
         if sugar:
           if color not in (black, red):
             data.append((slotname, color, dot_type, text, link))
+        elif wantjson:
+            # create the correct json hierarchy
+            # if we have a different host, write out previous array
+            if ( hostname.find(myhost) < 0 and len(myhost) > 0): 
+              print "%s %s" % (hostname, myhost)
+              myslotdata = {'name': longname(myhost), 'children': myslots}
+              data.append( myslotdata) 
+              myslots = []
+              myhost = hostname
+
+            # store the current job/slot info
+            # set sizeto 0 if name is null to ensure the slot isn't rendered ?
+            myslotinfo = {"name": slot, "size": 10, "user": dot_type, "rr": color[0], "gg": color[1], "bb":color[2]}
+            myslots.append(myslotinfo)
+
+        elif cave:
+            if ( hostname.find(myhost) < 0 and len(myhost) > 0): 
+              myslotdata = {'name': longname(myhost), 'children': myslots}
+              data.append( myslotdata) 
+              myslots = []
+              myhost = hostname
+            # store the current job/slot info
+            myslotinfo = {"name": slot, "size": 10, "user": dot_type, "c": csecs, "w": wsecs}
+            myslots.append(myslotinfo)
+
         elif not glidein:
           data.append((slotname, color, dot_type, text, link))
 
@@ -664,17 +797,29 @@ if sugar:
   filename = WEBDIR + '/sugar.html'
 elif admin:
   filename = WEBDIR + '/mosaic.html'
+if wantjson:
+  jsonfname = "/tmp/file.json"
+  jsonfile = "/tmp/jsonfile"
+  mkjson(data, jsonfname)
+  mkjsonfile(data, jsonfile)
+if cave:
+  nodefile = "/tmp/nodefile"
+  slotfile = "/tmp/slotfile"
+  mknodefile(data, nodefile)
+  mkslotfile(data, slotfile)
 elif glidein:
   filename = WEBDIR + '/glidein.html'
 else:
   filename = WEBDIR + '/sysview.html'
-mkpage(data, filename)
+
+if not wantjson and not cave:
+  mkpage(data, filename)
 timer.end()
 
 ## XXX  TODO We should fold the generation of the small image into
 ## the above - but for now ...
 
-if True:
+if not wantjson and not cave:
     timer = Timer("generate small image")
     if verbose: print "mksysimage.sh"
     p=os.popen('./mksysimage.sh','w')
