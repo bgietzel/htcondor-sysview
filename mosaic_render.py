@@ -797,6 +797,13 @@ if sugar:
   filename = WEBDIR + '/sugar.html'
 elif admin:
   filename = WEBDIR + '/mosaic.html'
+elif glidein:
+  filename = WEBDIR + '/glidein.html'
+else:
+  filename = WEBDIR + '/sysview.html'
+
+mkpage(data, filename)
+
 if wantjson:
   jsonfname = "/tmp/file.json"
   jsonfile = "/tmp/jsonfile"
@@ -807,13 +814,7 @@ if cave:
   slotfile = "/tmp/slotfile"
   mknodefile(data, nodefile)
   mkslotfile(data, slotfile)
-elif glidein:
-  filename = WEBDIR + '/glidein.html'
-else:
-  filename = WEBDIR + '/sysview.html'
 
-if not wantjson and not cave:
-  mkpage(data, filename)
 timer.end()
 
 ## XXX  TODO We should fold the generation of the small image into
