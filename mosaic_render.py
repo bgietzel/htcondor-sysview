@@ -10,7 +10,7 @@ import sys, os, re, time, string
 import memcache
 import json
 import socket
-
+import time
 
 legend_height = 350
 #legend_height = 300
@@ -793,27 +793,29 @@ for pool_abbr in pool_list:
 timer.end()
 
 timer = Timer("mkpage")
-if sugar:
-  filename = WEBDIR + '/sugar.html'
-elif admin:
-  filename = WEBDIR + '/mosaic.html'
-elif glidein:
-  filename = WEBDIR + '/glidein.html'
-else:
-  filename = WEBDIR + '/sysview.html'
 
-mkpage(data, filename)
-
+epoch_time = str(int(time.time()))
 if wantjson:
-  jsonfname = "/tmp/file.json"
-  jsonfile = "/tmp/jsonfile"
+  jsonfname = BASEDIR + '/json/' + epoch_time + '.json'
+  jsonfile = BASEDIR + '/json/' + epoch_time + '.txt'
   mkjson(data, jsonfname)
   mkjsonfile(data, jsonfile)
-if cave:
-  nodefile = "/tmp/nodefile"
-  slotfile = "/tmp/slotfile"
+elif cave:
+  nodefile = BASEDIR + '/cave/nodes.' + epoch_time 
+  slotfile = BASEDIR + '/cave/slots.' + epoch_time
   mknodefile(data, nodefile)
   mkslotfile(data, slotfile)
+
+else:
+  if sugar:
+    filename = WEBDIR + '/sugar.html'
+  elif admin:
+    filename = WEBDIR + '/mosaic.html'
+  elif glidein:
+    filename = WEBDIR + '/glidein.html'
+  else:
+    filename = WEBDIR + '/sysview.html'
+  mkpage(data, filename)
 
 timer.end()
 
