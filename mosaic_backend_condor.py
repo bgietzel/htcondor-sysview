@@ -309,7 +309,8 @@ for n in nodes:
 
 timer = Timer("set node info")
 
-mc_set(CLUSTER_ID+".nodes", node_names, 0)
+NODE_TTL = 12 * 60 * 60
+mc_set(CLUSTER_ID+".nodes", node_names, NODE_TTL)
 
 
 for n in nodes:
