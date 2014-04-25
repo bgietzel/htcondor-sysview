@@ -3,7 +3,7 @@ SYSVIEW README
 htcondor-sysview is an efficiency monitor for HTCondor pools and jobs.
 
 05.01.2013 1.13 release.
-Originally written as Mosaic Sysview by Charles Waldman and Sarah Williams and Rob Gardner of MWT2.org. Modified by Rebekah Gietzel (bgietzel@cs.wisc.edu) to work with UW-Madison CHTC pool and HTCondor features including partitionable slots, multiple pools and submitters.  Packaged by Nate Yehle (nyehle@cs.wisc.edu)
+Originally written as Mosaic Sysview by Charles Waldman and Sarah Williams and Rob Gardner of MWT2.org and UChicago. Modified by Rebekah Gietzel (bgietzel@cs.wisc.edu) to work with UW-Madison CHTC pool and HTCondor features including partitionable slots, multiple pools and submitters.  Packaged by Nate Yehle (nyehle@cs.wisc.edu)
 
 This 1.13 release should work with most HTCondor pool configs including static and partionable slots.
 
