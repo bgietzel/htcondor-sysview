@@ -63,6 +63,11 @@ for x in sys.argv:
 print "CLUSTER_ID is %s " % CLUSTER_ID
 print "URL is %s " % URL
 
+# set up node status counts for legend
+slotdesc = {green: "busy", red: "down", dkgrey: "owner", pink: "offline", black: "idle", dkgreen: "backfill", yellow: "glidein", dkyellow: "unclaimed" }
+
+slotdata = {green: 0, red: 0, pink:0, dkgrey: 0, black: 0, dkgreen: 0, yellow: 0, dkyellow: 0}
+
 main_timer = Timer("overall")
 
 # Poor man's lock
@@ -258,7 +263,7 @@ def mkpage(data, filename):
 
     curr_height = curr_height + eff_height 
 
-    slotdesc = {green: "busy", red: "down", dkgrey: "owner", pink: "offline", black: "idle", dkgreen: "backfill", yellow: "glidein", dkyellow: "unclaimed" }
+    #slotdesc = {green: "busy", red: "down", dkgrey: "owner", pink: "offline", black: "idle", dkgreen: "backfill", yellow: "glidein", dkyellow: "unclaimed" }
 
     # remove all other slot info for glideins
     if glidein:
@@ -397,6 +402,21 @@ def mkslotfile(data, filename):
       o.write(n)
       o.write(s)
       o.write("\n")
+  o.close()
+
+def mklegendfile(data, filename):
+
+  o = open(filename, 'w')
+
+  for color in slotdata.keys():
+    if sugar and color == green or not sugar:
+      if color is not yellow and color is not dkyellow:
+        count=str(slotdata[color])
+        status = slotdesc[color]
+        count_text = "%s %s" % (count, status)
+        o.write(count_text)
+        o.write("\n")
+  o.close()
 
 def hsl2rgb(h,s,l):
 ##  http://en.wikipedia.org/wiki/HSL_and_HSV#Conversion_from_HSL_to_RGB
@@ -508,7 +528,7 @@ timer = Timer("munge data")
 keys = []
 
 # set up node status counts for legend
-slotdata = {green: 0, red: 0, pink:0, dkgrey: 0, black: 0, dkgreen: 0, yellow: 0, dkyellow: 0}
+#slotdata = {green: 0, red: 0, pink:0, dkgrey: 0, black: 0, dkgreen: 0, yellow: 0, dkyellow: 0}
 
 myhost = "test"
 myslots = []
@@ -787,8 +807,19 @@ for pool_abbr in pool_list:
           if (color == black):
             slotdata[black] += 1
 
-        slotname = "%s/%s" % (host, slot)
-        data.append((slotname, color, dot_type, text, link))
+        if cave:
+          if ( hostname.find(myhost) < 0 and len(myhost) > 0): 
+            myslotdata = {'name': longname(myhost), 'children': myslots}
+            data.append( myslotdata) 
+            myslots = []
+            myhost = hostname
+          # store the current job/slot info
+          myslotinfo = {"name": slot, "size": 10, "user": dot_type, "c": csecs, "w": wsecs}
+          myslots.append(myslotinfo)
+
+        else:
+          slotname = "%s/%s" % (host, slot)
+          data.append((slotname, color, dot_type, text, link))
 
 timer.end()
 
@@ -803,8 +834,10 @@ if wantjson:
 elif cave:
   nodefile = BASEDIR + '/cave/nodes.' + epoch_time 
   slotfile = BASEDIR + '/cave/slots.' + epoch_time
+  legendfile = BASEDIR + '/cave/legend.' + epoch_time
   mknodefile(data, nodefile)
   mkslotfile(data, slotfile)
+  mklegendfile(data, legendfile)
 
 else:
   if sugar:
