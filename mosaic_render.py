@@ -71,12 +71,12 @@ slotdata = {green: 0, red: 0, pink:0, dkgrey: 0, black: 0, dkgreen: 0, yellow: 0
 main_timer = Timer("overall")
 
 # Poor man's lock
-p=os.popen('ps ax|grep mosaic_render.py|grep python|grep -v grep|wc -l')
-n = int(p.read())
-if n > 1:
-    if verbose: print "another mosaic_render instance is running, exiting"
-    sys.exit(1)
-p.close()
+#p=os.popen('ps ax|grep mosaic_render.py|grep python|grep -v grep|wc -l')
+#n = int(p.read())
+#if n > 1:
+#    if verbose: print "another mosaic_render instance is running, exiting"
+#    sys.exit(1)
+#p.close()
 
 
 def img(ostream, arg, width, height, left, top, name=None, text=None, link=None):
