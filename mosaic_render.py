@@ -22,6 +22,7 @@ admin = False
 sugar = False
 glidein = False
 wantjson = False
+wantjson2 = False
 cave = False
 print_times = False
 
@@ -46,6 +47,10 @@ for x in sys.argv:
     if x.startswith('-j'):
         wantjson = True
         print "write results to json file"
+    if x.startswith('-k'):
+        wantjson2 = True
+        admin = True
+        print "write results to new json file"
     if x.startswith('-c'):
         cave = True
         print "write files for cave"
@@ -201,7 +206,7 @@ def mkpage(data, filename):
                 break
 
             # leave room for the legend at top
-            name, (r,g,b), dot_type, text, link = data[n]
+            name, (r,g,b), dot_type, state, text, link = data[n]
 
             # try changing bgcolor to yellow if glidein
             if glidein:
@@ -312,7 +317,25 @@ def mkpage(data, filename):
 def mkjson(data, filename):
   with open(filename, 'w') as outfile:
     json.dump(data, outfile)
-    #name, (r,g,b), dot_type, text, link = data[n]
+
+# json format for html5 sysview
+def mkjson2(data, filename):
+  try:
+    if verbose: print "Making json file..."
+    jsonfile = open(filename, "w")
+    dataDict = { "time": time.ctime(), "nodes": []}
+    for i, nodeData in enumerate(data):
+        if verbose: print i, nodeData
+        name, (r,g,b), dot_type, state, text, link = nodeData
+        br=127
+        bb=127
+        bg=127 
+        dataDict["nodes"].append({"name": name, "state": state, "color": {"r": r, "g": g, "b": b}, "background_color": {"r": br, "g": bg, "b": bb}, "dot_type": dot_type, "text": text, "link": link})
+    json.dump(dataDict, jsonfile)
+    jsonfile.close()
+    if verbose: print "done"
+  except Exception, e:
+    if verbose: print "Error making json file: ", e
 
 
 # write out text file  
@@ -609,6 +632,7 @@ for pool_abbr in pool_list:
             color = rgb(wsecs, csecs)
             if verbose: print "COLOR %s %s %s " % (color, wsecs, csecs)
             slotdata[green] += 1
+            state = "busy"
 
             # is this a boinc job?
             if ( job.startswith(".")):
@@ -617,6 +641,7 @@ for pool_abbr in pool_list:
               color = rgb(7200, 7200)
               effcy = 100
               slotdata[dkgreen] += 1
+              state = "backfill"
          
             # is this a slurm job?
             if ( job.endswith(".")):
@@ -625,6 +650,7 @@ for pool_abbr in pool_list:
               color = rgb(7200, 7200)
               effcy = 100
               slotdata[dkgreen] += 1
+              state = "backfill"
 
             if debug: print "dot_type is %s" % dot_type
  
@@ -643,6 +669,7 @@ for pool_abbr in pool_list:
         elif 'owner' in state and not job:
             color = dkgrey
             slotdata[dkgrey] += 1
+            state = "owner"
         if msg and 'ERROR' in msg:
             color = red
             slotdata[red] += 1
@@ -675,7 +702,7 @@ for pool_abbr in pool_list:
         # only publish active cpus for sugar mode
         if sugar:
           if color not in (black, red):
-            data.append((slotname, color, dot_type, text, link))
+            data.append((slotname, color, dot_type, state, text, link))
         elif wantjson:
             # create the correct json hierarchy
             # if we have a different host, write out previous array
@@ -702,7 +729,7 @@ for pool_abbr in pool_list:
             myslots.append(myslotinfo)
 
         elif not glidein:
-          data.append((slotname, color, dot_type, text, link))
+          data.append((slotname, color, dot_type, state, text, link))
 
         if verbose: print "slotname %s " % (slotname)    
         if verbose: print "color %d %d %d " % (color[0], color[1], color[2]) 
@@ -711,6 +738,7 @@ for pool_abbr in pool_list:
         if verbose: print "link %s " % link      
         if (color == black):
           slotdata[black] += 1
+          state = "idle"
 
     # ensure we have a glidein by looking at the hostname
     elif ( pool_abbr.startswith('glidein') and pool.startswith('glidein') and glidein):
@@ -799,6 +827,8 @@ for pool_abbr in pool_list:
 
           color = rgb(wsecs, csecs)
           slotdata[yellow] += 1
+          # reuse state to write to json file for UI
+          state = "glidein"
 
         else:
           wsecs = csecs = 0
@@ -819,7 +849,7 @@ for pool_abbr in pool_list:
 
         else:
           slotname = "%s/%s" % (host, slot)
-          data.append((slotname, color, dot_type, text, link))
+          data.append((slotname, color, dot_type, state, text, link))
 
 timer.end()
 
@@ -831,6 +861,11 @@ if wantjson:
   jsonfile = BASEDIR + '/json/' + epoch_time + '.txt'
   mkjson(data, jsonfname)
   mkjsonfile(data, jsonfile)
+
+if wantjson2:
+  jsonfname = BASEDIR + '/mosaic.json'
+  mkjson2(data, jsonfname)
+
 elif cave:
   nodefile = BASEDIR + '/cave/nodes.' + epoch_time 
   slotfile = BASEDIR + '/cave/slots.' + epoch_time
@@ -845,6 +880,9 @@ else:
   elif admin:
     filename = WEBDIR + '/mosaic.html'
   elif glidein:
+    jsonfname = BASEDIR + '/glidein.json'
+    data.sort()
+    mkjson2(data, jsonfname)
     filename = WEBDIR + '/glidein.html'
   else:
     filename = WEBDIR + '/sysview.html'
