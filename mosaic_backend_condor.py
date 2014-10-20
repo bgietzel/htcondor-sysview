@@ -171,7 +171,7 @@ for pool_abbr, pool_name in pool_names.items():
         nodestate = 'offline'
     elif k == 'NodeOnlineReason':
         nodenote = v
-    if  k == 'State' and v == 'Owner' and (pool_abbr == 'cs' or pool_abbr == 'cae'):
+    if  k == 'State' and v == 'Owner' and (pool_abbr == 'cs' or pool_abbr == 'cae' or pool_abbr == 'doit'):
         nodestate = 'owner'
 
     # find the LoadAvg
